@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import anthropic
+from dotenv import load_dotenv
 
 from wiki_qa import config
 from wiki_qa.prompts import SEARCH_WIKIPEDIA_TOOL, SYSTEM_PROMPT
@@ -27,6 +28,7 @@ def answer(
 ) -> AnswerResult:
     """Run the tool-use loop and return the final answer plus metadata."""
     if client is None:
+        load_dotenv()
         client = anthropic.Anthropic()
 
     messages: list = [{"role": "user", "content": question}]
