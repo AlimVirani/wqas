@@ -52,3 +52,6 @@ anthropic, requests, pytest. That's it for now. Resist adding more.
   library. Plain code.
 - No LangChain or similar. The whole point of this assignment is to write
   the agent loop ourselves.
+
+## Notes
+See EVAL_NOTES.md for baseline observations and Phase 2 eval design implications.
