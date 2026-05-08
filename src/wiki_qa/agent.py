@@ -1,4 +1,7 @@
 """Claude tool-use loop for Wikipedia-backed QA."""
+from __future__ import annotations
+
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import anthropic
@@ -20,6 +23,7 @@ def answer(
     *,
     client: anthropic.Anthropic | None = None,
     max_turns: int = 10,
+    on_search: Callable[[str], None] | None = None,
 ) -> AnswerResult:
     """Run the tool-use loop and return the final answer plus metadata."""
     if client is None:
@@ -51,6 +55,8 @@ def answer(
                 if block.type != "tool_use":
                     continue
                 query = block.input["query"]
+                if on_search is not None:
+                    on_search(query)
                 searches.append(query)
                 results: list[SearchResult] = search(query)
                 tool_results.append({

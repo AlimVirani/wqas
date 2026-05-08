@@ -1,4 +1,6 @@
 """Tests for wiki_qa.wikipedia — all HTTP calls are mocked."""
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -148,3 +150,11 @@ def test_search_calls_wikipedia_api() -> None:
         search("anything")
     url = mock_get.call_args.args[0]
     assert "wikipedia.org" in url
+
+
+def test_search_sends_user_agent_header() -> None:
+    """Must include a non-empty User-Agent header (MediaWiki API policy)."""
+    with patch("wiki_qa.wikipedia.requests.get", return_value=_mock_response({})) as mock_get:
+        search("anything")
+    headers = mock_get.call_args.kwargs.get("headers", {})
+    assert headers.get("User-Agent")

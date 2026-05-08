@@ -37,6 +37,12 @@ tests/
   test_agent.py
   test_graders.py
 
+## Environment
+- Python runtime: `.venv/bin/python` (Python 3.11). Always use this — never the system `python` or `python3`.
+- Run tests: `.venv/bin/python -m pytest tests/`
+- Run CLI: `.venv/bin/python -m wiki_qa`
+- Install (editable): `.venv/bin/pip install -e .`
+
 ## Dependencies
 anthropic, requests, pytest. That's it for now. Resist adding more.
 

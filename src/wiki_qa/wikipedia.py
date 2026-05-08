@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import requests
 
 _API_URL = "https://en.wikipedia.org/w/api.php"
+USER_AGENT = "wiki-qa/0.1 (https://github.com/AlimVirani/wqas; alimv@alumni.ubc.ca)"
 
 
 @dataclass
@@ -29,7 +30,7 @@ def search(query: str, limit: int = 3) -> list[SearchResult]:
         "explaintext": True,
         "format": "json",
     }
-    response = requests.get(_API_URL, params=params)
+    response = requests.get(_API_URL, params=params, headers={"User-Agent": USER_AGENT})
     response.raise_for_status()
     data = response.json()
 
