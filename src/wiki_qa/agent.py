@@ -9,14 +9,14 @@ from dotenv import load_dotenv
 
 from wiki_qa import config
 from wiki_qa.prompts import SEARCH_WIKIPEDIA_TOOL, SYSTEM_PROMPT
-from wiki_qa.wikipedia import SearchResult, search
+from wiki_qa.wikipedia import SearchResult, format_results, search
 
 
 @dataclass
 class AnswerResult:
     answer: str
     searches: list[str]
-    messages: list
+    messages: list[dict]
 
 
 def answer(
@@ -31,7 +31,7 @@ def answer(
         load_dotenv()
         client = anthropic.Anthropic()
 
-    messages: list = [{"role": "user", "content": question}]
+    messages: list[dict] = [{"role": "user", "content": question}]
     searches: list[str] = []
 
     for _ in range(max_turns):
@@ -64,14 +64,8 @@ def answer(
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": _format_results(results),
+                    "content": format_results(results),
                 })
             messages.append({"role": "user", "content": tool_results})
 
     raise RuntimeError(f"Agent did not finish within {max_turns} turns.")
-
-
-def _format_results(results: list[SearchResult]) -> str:
-    if not results:
-        return "No results found."
-    return "\n\n".join(f"**{r.title}**\n{r.extract}" for r in results)

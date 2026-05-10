@@ -13,7 +13,7 @@ from wiki_qa.evals.graders import fact_recall, honest_failure, search_behavior
 class CaseResult:
     case: EvalCase
     answer_result: AnswerResult
-    grades: dict  # grader_name -> grade dict
+    grades: dict[str, dict]
 
 
 def _grade_label(grade: dict) -> str:

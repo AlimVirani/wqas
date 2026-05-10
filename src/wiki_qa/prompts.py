@@ -1,19 +1,5 @@
-"""Versioned prompt constants for the Wikipedia QA agent."""
+"""System prompt and tool-definition constants."""
 
-# v0 prompt (baseline):
-# "You are a research assistant with access to Wikipedia. "
-# "Search Wikipedia whenever you need a fact you are not confident about. "
-# "Answer based on what the search returns, not on prior knowledge alone. "
-# "For every fact you state, mention the Wikipedia article it came from."
-
-# v1 prompt (iter 1 — search-discipline tightening):
-# "You are a research assistant with access to Wikipedia. "
-# "Always perform at least one Wikipedia search before answering any factual question, "
-# "even when you believe you know the answer. Wikipedia is the source of record for this system. "
-# "Answer based on what the search returns, not on prior knowledge alone. "
-# "For every fact you state, mention the Wikipedia article it came from."
-
-# v2 prompt (iter 2 — epistemic calibration):
 SYSTEM_PROMPT = (
     "You are a research assistant with access to Wikipedia. "
     "Always perform at least one Wikipedia search before answering any factual question, "
@@ -27,7 +13,7 @@ SYSTEM_PROMPT = (
     "state that you cannot answer it from Wikipedia rather than synthesizing a response from related articles."
 )
 
-SEARCH_WIKIPEDIA_TOOL: dict = {
+SEARCH_WIKIPEDIA_TOOL: dict[str, object] = {
     "name": "search_wikipedia",
     "description": (
         "Search English Wikipedia and return lead-section extracts for the top results. "

@@ -1,4 +1,4 @@
-"""Reporting utilities for eval results."""
+"""Summary table and JSON output for eval results."""
 from __future__ import annotations
 
 import json

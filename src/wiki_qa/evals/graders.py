@@ -1,4 +1,4 @@
-"""Grader functions for eval cases."""
+"""Grader functions for eval cases. honest_failure uses LLM-as-judge."""
 from __future__ import annotations
 
 import json

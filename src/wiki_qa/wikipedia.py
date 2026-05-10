@@ -4,7 +4,8 @@ from dataclasses import dataclass
 import requests
 
 _API_URL = "https://en.wikipedia.org/w/api.php"
-USER_AGENT = "wiki-qa/0.1 (https://github.com/AlimVirani/wqas; alimv@alumni.ubc.ca)"
+# Wikipedia's User-Agent policy requires identifying contact info.
+_USER_AGENT = "wiki-qa/0.1 (https://github.com/AlimVirani/wqas; alimv@alumni.ubc.ca)"
 
 
 @dataclass
@@ -30,7 +31,7 @@ def search(query: str, limit: int = 3) -> list[SearchResult]:
         "explaintext": True,
         "format": "json",
     }
-    response = requests.get(_API_URL, params=params, headers={"User-Agent": USER_AGENT})
+    response = requests.get(_API_URL, params=params, headers={"User-Agent": _USER_AGENT})
     response.raise_for_status()
     data = response.json()
 
@@ -39,3 +40,10 @@ def search(query: str, limit: int = 3) -> list[SearchResult]:
         SearchResult(title=page.get("title", ""), extract=page.get("extract", ""))
         for page in sorted(pages.values(), key=lambda p: p.get("index", 0))
     ]
+
+
+def format_results(results: list[SearchResult]) -> str:
+    """Format search results as a markdown string for the agent."""
+    if not results:
+        return "No results found."
+    return "\n\n".join(f"**{r.title}**\n{r.extract}" for r in results)
