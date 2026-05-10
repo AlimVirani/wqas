@@ -3,59 +3,90 @@ from __future__ import annotations
 
 import json
 import os
-from collections import defaultdict
 
 from wiki_qa.evals.runner import CaseResult
 
 _GRADERS = ["fact_recall", "search_behavior", "honest_failure", "faithfulness"]
+_SHORT = {"fact_recall": "fact", "search_behavior": "search", "honest_failure": "honest", "faithfulness": "faith"}
+
+_PASS = "✓"
+_FAIL = "✗"
+_NA   = "·"
+_SKIP = "−"
 
 
-def _label(grade: dict) -> str:
+def _sym(grade: dict | None) -> str:
+    if grade is None:
+        return _SKIP
     if not grade.get("applicable", True):
+        return _NA
+    return _PASS if grade["passed"] else _FAIL
+
+
+def _score(cases: list[CaseResult], grader: str) -> str:
+    applicable = [r for r in cases if r.grades.get(grader) is not None and r.grades[grader].get("applicable", True)]
+    if not applicable:
         return "n/a"
-    return "PASS" if grade["passed"] else "FAIL"
+    passed = sum(1 for r in applicable if r.grades[grader]["passed"])
+    return f"{passed}/{len(applicable)}"
 
 
 def summarize(results: list[CaseResult]) -> None:
-    """Print per-case table, per-category pass rates, and overall pass rates."""
-    print()
-    header = f"{'id':<35} {'category':<25} {'fact_recall':<14} {'search_behavior':<18} {'honest_failure':<18} {'faithfulness'}"
-    print(header)
-    print("-" * len(header))
-    for r in results:
-        fr = _label(r.grades["fact_recall"])
-        sb = _label(r.grades["search_behavior"])
-        hf = _label(r.grades["honest_failure"])
-        fa = _label(r.grades["faithfulness"])
-        print(f"{r.case.id:<35} {r.case.category:<25} {fr:<14} {sb:<18} {hf:<18} {fa}")
+    """Print symbol-based summary, per-case table grouped by category, and pass rates."""
+    # Graders that were actually run in this batch
+    run_graders = [g for g in _GRADERS if any(g in r.grades for r in results)]
 
-    # Per-category pass rates (applicable cases only)
-    cat_totals: dict[str, dict[str, list[bool]]] = defaultdict(lambda: {g: [] for g in _GRADERS})
-    overall: dict[str, list[bool]] = {g: [] for g in _GRADERS}
+    # Category groups preserving dataset order
+    cats: dict[str, list[CaseResult]] = {}
     for r in results:
-        for g in _GRADERS:
-            grade = r.grades[g]
-            if grade.get("applicable", True):
-                cat_totals[r.case.category][g].append(grade["passed"])
-                overall[g].append(grade["passed"])
+        cats.setdefault(r.case.category, []).append(r)
 
-    print()
-    print("Per-category pass rates (applicable cases only):")
-    for cat in sorted(cat_totals):
+    n_cases = len(results)
+    n_graders = len(run_graders)
+    print(f"\nWikipedia QA eval suite — {n_cases} cases, {n_graders} graders\n")
+
+    # Summary bar: one row per grader, symbols grouped by category
+    for g in run_graders:
+        cat_blocks = ["".join(_sym(r.grades.get(g)) for r in cat_rs) for cat_rs in cats.values()]
+        sym_str = "  ".join(cat_blocks)
+        score = _score(results, g)
+        label = _SHORT.get(g, g)
+        print(f"  {label:<10} {sym_str}   {score}")
+
+    # Per-case table grouped by category
+    print("\nBy case:\n")
+    for cat, cat_results in cats.items():
+        print(f"{cat} ({len(cat_results)})")
+        for r in cat_results:
+            row_syms = "".join(_sym(r.grades.get(g)) for g in run_graders)
+            detail = "  ".join(
+                f"{_SHORT.get(g, g)}:{_sym(r.grades.get(g))}" for g in run_graders
+            )
+            print(f"  {row_syms}  {r.case.id:<42} {detail}")
+        print()
+
+    # Per-category pass rates
+    print("Per-category pass rates:")
+    for cat, cat_results in cats.items():
         parts = []
-        for g in _GRADERS:
-            vals = cat_totals[cat][g]
-            if vals:
-                parts.append(f"{g}: {sum(vals)}/{len(vals)}")
-        print(f"  {cat}: {', '.join(parts) if parts else 'no applicable grades'}")
+        for g in run_graders:
+            applicable = [r for r in cat_results if r.grades.get(g) is not None and r.grades[g].get("applicable", True)]
+            if not applicable:
+                parts.append(f"{_SHORT.get(g, g)}:n/a")
+            else:
+                passed = sum(1 for r in applicable if r.grades[g]["passed"])
+                parts.append(f"{_SHORT.get(g, g)}:{passed}/{len(applicable)}")
+        print(f"  {cat:<30} {', '.join(parts)}")
 
+    # Overall
     print()
-    print("Overall pass rates:")
-    for g in _GRADERS:
-        vals = overall[g]
-        if vals:
-            pct = 100 * sum(vals) // len(vals)
-            print(f"  {g}: {sum(vals)}/{len(vals)} ({pct}%)")
+    print("Overall:")
+    for g in run_graders:
+        applicable = [r for r in results if r.grades.get(g) is not None and r.grades[g].get("applicable", True)]
+        if applicable:
+            passed = sum(1 for r in applicable if r.grades[g]["passed"])
+            pct = 100 * passed // len(applicable)
+            print(f"  {g}: {passed}/{len(applicable)} ({pct}%)")
         else:
             print(f"  {g}: n/a")
 
@@ -79,7 +110,7 @@ def dump_json(results: list[CaseResult], path: str) -> None:
             "retrieved": [
                 [{"title": sr.title, "extract": sr.extract} for sr in per_query]
                 for per_query in r.answer_result.retrieved
-            ],
+            ] if r.answer_result.retrieved else [],
             "grades": r.grades,
         })
     with open(path, "w") as f:

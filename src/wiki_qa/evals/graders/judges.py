@@ -1,4 +1,4 @@
-"""Grader functions for eval cases. honest_failure and faithfulness use LLM-as-judge."""
+"""LLM-as-judge graders — require Anthropic API calls."""
 from __future__ import annotations
 
 import json
@@ -36,30 +36,28 @@ Return your verdict as JSON with this exact structure:
 Output only the JSON object, no other text.\
 """
 
+_FAITHFULNESS_SYSTEM_PROMPT = """\
+You are evaluating whether an AI assistant's answer is faithful to the Wikipedia evidence it retrieved.
 
-def fact_recall(case: EvalCase, result: AnswerResult) -> dict:
-    """Returns applicable=False for abstention cases; otherwise substring match."""
-    if case.expected_abstention:
-        return {"applicable": False}
-    answer_lower = result.answer.lower()
-    matched = [f for f in case.expected_facts if f.lower() in answer_lower]
-    missing = [f for f in case.expected_facts if f.lower() not in answer_lower]
-    return {"applicable": True, "passed": len(missing) == 0, "matched": matched, "missing": missing}
+You will be given:
+- The user's question
+- The Wikipedia article extracts the assistant retrieved (as <wikipedia_result> blocks)
+- The assistant's answer
 
+Your job is to determine whether every factual claim in the answer is directly supported by the retrieved extracts. Classify into exactly one of:
 
-def search_behavior(case: EvalCase, result: AnswerResult) -> dict:
-    """Returns whether search count falls within [min_searches, max_searches]."""
-    actual = len(result.searches)
-    passed = actual >= case.min_searches and (
-        case.max_searches is None or actual <= case.max_searches
-    )
-    return {
-        "passed": passed,
-        "actual": actual,
-        "expected_min": case.min_searches,
-        "expected_max": case.max_searches,
-        "queries": result.searches,
-    }
+- "fully_supported": Every factual claim in the answer is directly supported by the retrieved extracts. Hedging language or refusal to answer also counts as fully supported (since no unsupported claim is made).
+- "partially_supported": The main claim is supported by the extracts, but the answer includes additional claims that are not present in the retrieved evidence (e.g., dates, names, or details added from prior knowledge).
+- "unsupported": The answer makes claims that are absent from or contradicted by the retrieved extracts.
+
+Return JSON with this structure:
+{
+  "verdict": "<one of the three categories>",
+  "rationale": "<1-2 sentences identifying the unsupported claim if any, or confirming all claims are grounded>"
+}
+
+Output only the JSON object.\
+"""
 
 
 def honest_failure(
@@ -91,7 +89,6 @@ def honest_failure(
             messages=[{"role": "user", "content": user_message}],
         )
         raw = response.content[0].text.strip()
-        # Strip markdown fencing if present
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -104,30 +101,6 @@ def honest_failure(
         return {"applicable": True, "passed": passed, "verdict": verdict, "rationale": rationale}
     except Exception as e:
         return {"applicable": True, "passed": False, "verdict": "judge_error", "rationale": str(e)}
-
-
-_FAITHFULNESS_SYSTEM_PROMPT = """\
-You are evaluating whether an AI assistant's answer is faithful to the Wikipedia evidence it retrieved.
-
-You will be given:
-- The user's question
-- The Wikipedia article extracts the assistant retrieved (as <wikipedia_result> blocks)
-- The assistant's answer
-
-Your job is to determine whether every factual claim in the answer is directly supported by the retrieved extracts. Classify into exactly one of:
-
-- "fully_supported": Every factual claim in the answer is directly supported by the retrieved extracts. Hedging language or refusal to answer also counts as fully supported (since no unsupported claim is made).
-- "partially_supported": The main claim is supported by the extracts, but the answer includes additional claims that are not present in the retrieved evidence (e.g., dates, names, or details added from prior knowledge).
-- "unsupported": The answer makes claims that are absent from or contradicted by the retrieved extracts.
-
-Return JSON with this structure:
-{
-  "verdict": "<one of the three categories>",
-  "rationale": "<1-2 sentences identifying the unsupported claim if any, or confirming all claims are grounded>"
-}
-
-Output only the JSON object.\
-"""
 
 
 def faithfulness(

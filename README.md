@@ -82,6 +82,27 @@ New South Wales, at least 100 miles from Sydney.
 Question: quit
 ```
 
+## Running evals
+
+The eval suite measures system quality across four dimensions: factual correctness,
+search behavior, honest failure (LLM-judge), and faithfulness to retrieved evidence
+(LLM-judge).
+
+Run everything:
+
+```bash
+.venv/bin/python -m wiki_qa.evals
+```
+
+Fast mode — only the automated graders, no LLM calls (~30 seconds vs ~15 minutes):
+
+```bash
+.venv/bin/python -m wiki_qa.evals --fast
+```
+
+Results are written to `results/latest.json` by default. Historical runs across
+prompt versions live in `results/v*.json` — see `results/README.md` for details.
+
 ## Project structure
 
 ```
@@ -93,9 +114,19 @@ src/wiki_qa/
   prompts.py        # SYSTEM_PROMPT and SEARCH_WIKIPEDIA_TOOL constants
   config.py         # MODEL and MAX_TOKENS
   __main__.py       # enables python -m wiki_qa
+  evals/
+    dataset.py      # 24 EvalCase definitions across 6 categories
+    runner.py       # runs cases through the agent, collects CaseResult objects
+    reporting.py    # symbol-based summary output and JSON serialization
+    graders/
+      __init__.py   # re-exports all four public grader functions
+      automated.py  # fact_recall, search_behavior — pure functions, no API calls
+      judges.py     # honest_failure, faithfulness — LLM-as-judge via Anthropic API
 tests/
-  test_wikipedia.py # wikipedia client unit tests (HTTP mocked)
-  test_agent.py     # agent loop unit tests (Anthropic client mocked)
+  test_wikipedia.py          # wikipedia client unit tests (HTTP mocked)
+  test_agent.py              # agent loop unit tests (Anthropic client mocked)
+  test_graders.py            # LLM-judge grader tests (Anthropic client mocked)
+  test_automated_graders.py  # fact_recall and search_behavior unit tests
 ```
 
 ## Running tests

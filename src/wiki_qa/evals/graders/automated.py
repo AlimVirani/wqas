@@ -1,0 +1,30 @@
+"""Fast automated graders — no LLM calls."""
+from __future__ import annotations
+
+from wiki_qa.agent import AnswerResult
+from wiki_qa.evals.dataset import EvalCase
+
+
+def fact_recall(case: EvalCase, result: AnswerResult) -> dict:
+    """Returns applicable=False for abstention cases; otherwise substring match."""
+    if case.expected_abstention:
+        return {"applicable": False}
+    answer_lower = result.answer.lower()
+    matched = [f for f in case.expected_facts if f.lower() in answer_lower]
+    missing = [f for f in case.expected_facts if f.lower() not in answer_lower]
+    return {"applicable": True, "passed": len(missing) == 0, "matched": matched, "missing": missing}
+
+
+def search_behavior(case: EvalCase, result: AnswerResult) -> dict:
+    """Returns whether search count falls within [min_searches, max_searches]."""
+    actual = len(result.searches)
+    passed = actual >= case.min_searches and (
+        case.max_searches is None or actual <= case.max_searches
+    )
+    return {
+        "passed": passed,
+        "actual": actual,
+        "expected_min": case.min_searches,
+        "expected_max": case.max_searches,
+        "queries": result.searches,
+    }

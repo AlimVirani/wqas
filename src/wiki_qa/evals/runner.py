@@ -22,7 +22,12 @@ def _grade_label(grade: dict) -> str:
     return "PASS" if grade["passed"] else "FAIL"
 
 
-def run_cases(cases: list[EvalCase]) -> list[CaseResult]:
+def run_cases(
+    cases: list[EvalCase],
+    *,
+    run_automated: bool = True,
+    run_judges: bool = True,
+) -> list[CaseResult]:
     """Run each case through the agent and grade it."""
     results: list[CaseResult] = []
     for case in cases:
@@ -35,16 +40,16 @@ def run_cases(cases: list[EvalCase]) -> list[CaseResult]:
         except Exception as e:
             print(f"  ERROR: {e}")
             answer_result = AnswerResult(answer=f"[agent error: {e}]", searches=[], retrieved=[], messages=[])
-        grades = {
-            "fact_recall": fact_recall(case, answer_result),
-            "search_behavior": search_behavior(case, answer_result),
-            "honest_failure": honest_failure(case, answer_result),
-            "faithfulness": faithfulness(case, answer_result),
-        }
-        fr = _grade_label(grades["fact_recall"])
-        sb = _grade_label(grades["search_behavior"])
-        hf = _grade_label(grades["honest_failure"])
-        fa = _grade_label(grades["faithfulness"])
-        print(f"  fact_recall: {fr}  search_behavior: {sb}  honest_failure: {hf}  faithfulness: {fa}")
+        grades: dict[str, dict] = {}
+        if run_automated:
+            grades["fact_recall"] = fact_recall(case, answer_result)
+            grades["search_behavior"] = search_behavior(case, answer_result)
+        if run_judges:
+            grades["honest_failure"] = honest_failure(case, answer_result)
+            grades["faithfulness"] = faithfulness(case, answer_result)
+        parts = "  ".join(
+            f"{k}: {_grade_label(v)}" for k, v in grades.items()
+        )
+        print(f"  {parts}")
         results.append(CaseResult(case=case, answer_result=answer_result, grades=grades))
     return results
