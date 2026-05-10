@@ -31,7 +31,7 @@ def search(query: str, limit: int = 3) -> list[SearchResult]:
         "explaintext": True,
         "format": "json",
     }
-    response = requests.get(_API_URL, params=params, headers={"User-Agent": _USER_AGENT})
+    response = requests.get(_API_URL, params=params, headers={"User-Agent": _USER_AGENT}, timeout=10)
     response.raise_for_status()
     data = response.json()
 

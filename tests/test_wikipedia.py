@@ -158,3 +158,12 @@ def test_search_sends_user_agent_header() -> None:
         search("anything")
     headers = mock_get.call_args.kwargs.get("headers", {})
     assert headers.get("User-Agent")
+
+
+def test_search_passes_timeout() -> None:
+    """Must pass a timeout to requests.get to avoid hanging forever."""
+    with patch("wiki_qa.wikipedia.requests.get", return_value=_mock_response({})) as mock_get:
+        search("anything")
+    timeout = mock_get.call_args.kwargs.get("timeout")
+    assert timeout is not None
+    assert timeout > 0

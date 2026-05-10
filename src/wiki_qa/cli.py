@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse
 import sys
 
+import anthropic
+import requests
+
 from wiki_qa import agent
 
 DEMO_QUESTIONS = [
@@ -18,6 +21,23 @@ DEMO_QUESTIONS = [
 
 def _on_search(query: str) -> None:
     print(f"→ searching: '{query}'")
+
+
+def _handle_error(e: Exception, exit_on_error: bool = False) -> None:
+    if isinstance(e, requests.exceptions.RequestException):
+        print(
+            f"Error: Wikipedia request failed ({e}). Try again or check your connection.",
+            file=sys.stderr,
+        )
+    elif isinstance(e, anthropic.APIError):
+        print(
+            f"Error: Anthropic API request failed ({e}). Check your ANTHROPIC_API_KEY.",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Error: {e}", file=sys.stderr)
+    if exit_on_error:
+        sys.exit(1)
 
 
 def _run_question(question: str) -> None:
@@ -44,7 +64,10 @@ def _run_repl() -> None:
             break
         if not line or line.lower() in {"quit", "exit"}:
             break
-        _run_question(line)
+        try:
+            _run_question(line)
+        except Exception as e:
+            _handle_error(e)
 
 
 def main() -> None:
@@ -65,9 +88,15 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.demo:
-        _run_demo()
+        try:
+            _run_demo()
+        except Exception as e:
+            _handle_error(e, exit_on_error=True)
     elif args.question:
-        _run_question(args.question)
+        try:
+            _run_question(args.question)
+        except Exception as e:
+            _handle_error(e, exit_on_error=True)
     else:
         _run_repl()
 
