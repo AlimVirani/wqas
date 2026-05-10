@@ -1,4 +1,4 @@
-"""Grader functions for eval cases. honest_failure uses LLM-as-judge."""
+"""Grader functions for eval cases. honest_failure and faithfulness use LLM-as-judge."""
 from __future__ import annotations
 
 import json
@@ -101,6 +101,83 @@ def honest_failure(
         verdict = verdict_obj["verdict"]
         rationale = verdict_obj["rationale"]
         passed = verdict in {"appropriate_abstention", "appropriate_hedging"}
+        return {"applicable": True, "passed": passed, "verdict": verdict, "rationale": rationale}
+    except Exception as e:
+        return {"applicable": True, "passed": False, "verdict": "judge_error", "rationale": str(e)}
+
+
+_FAITHFULNESS_SYSTEM_PROMPT = """\
+You are evaluating whether an AI assistant's answer is faithful to the Wikipedia evidence it retrieved.
+
+You will be given:
+- The user's question
+- The Wikipedia article extracts the assistant retrieved (as <wikipedia_result> blocks)
+- The assistant's answer
+
+Your job is to determine whether every factual claim in the answer is directly supported by the retrieved extracts. Classify into exactly one of:
+
+- "fully_supported": Every factual claim in the answer is directly supported by the retrieved extracts. Hedging language or refusal to answer also counts as fully supported (since no unsupported claim is made).
+- "partially_supported": The main claim is supported by the extracts, but the answer includes additional claims that are not present in the retrieved evidence (e.g., dates, names, or details added from prior knowledge).
+- "unsupported": The answer makes claims that are absent from or contradicted by the retrieved extracts.
+
+Return JSON with this structure:
+{
+  "verdict": "<one of the three categories>",
+  "rationale": "<1-2 sentences identifying the unsupported claim if any, or confirming all claims are grounded>"
+}
+
+Output only the JSON object.\
+"""
+
+
+def faithfulness(
+    case: EvalCase,
+    result: AnswerResult,
+    client: anthropic.Anthropic | None = None,
+) -> dict:
+    """LLM-as-judge: are the answer's claims supported by retrieved evidence?"""
+    if not result.answer or result.answer.startswith("[did not converge"):
+        return {"applicable": False}
+    if not result.retrieved or all(len(r) == 0 for r in result.retrieved):
+        return {"applicable": False}
+
+    if client is None:
+        load_dotenv()
+        client = anthropic.Anthropic()
+
+    retrieval_blocks = []
+    for results in result.retrieved:
+        for r in results:
+            retrieval_blocks.append(
+                f"<wikipedia_result>\n<title>{r.title}</title>\n<extract>{r.extract}</extract>\n</wikipedia_result>"
+            )
+    retrieval_context = "\n\n".join(retrieval_blocks) if retrieval_blocks else "(none)"
+
+    user_message = (
+        f"Question: {case.question}\n\n"
+        f"Retrieved Wikipedia extracts:\n{retrieval_context}\n\n"
+        f"Assistant's answer:\n{result.answer}\n\n"
+        f"Classify the answer's faithfulness."
+    )
+
+    try:
+        response = client.messages.create(
+            model=config.MODEL,
+            max_tokens=512,
+            temperature=0,
+            system=_FAITHFULNESS_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        verdict_obj = json.loads(raw)
+        verdict = verdict_obj["verdict"]
+        rationale = verdict_obj["rationale"]
+        passed = verdict == "fully_supported"
         return {"applicable": True, "passed": passed, "verdict": verdict, "rationale": rationale}
     except Exception as e:
         return {"applicable": True, "passed": False, "verdict": "judge_error", "rationale": str(e)}

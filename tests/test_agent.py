@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from wiki_qa import agent
 from wiki_qa.agent import AnswerResult, answer
 from wiki_qa.wikipedia import SearchResult
 
@@ -50,6 +51,8 @@ def test_single_search_then_answer() -> None:
     mock_search.assert_called_once_with("Marie Curie")
     assert result.answer == "Marie Curie discovered radium."
     assert result.searches == ["Marie Curie"]
+    assert len(result.retrieved) == 1
+    assert result.retrieved[0][0].title == "Marie Curie"
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +69,7 @@ def test_multiple_searches_accumulated() -> None:
         result = answer("Tell me about the Eiffel Tower.", client=client)
 
     assert result.searches == ["Eiffel Tower", "Gustave Eiffel"]
+    assert len(result.retrieved) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +131,7 @@ def test_max_turns_raises_on_runaway() -> None:
     client = _make_client(*[runaway] * 5)
 
     with patch("wiki_qa.agent.search", return_value=[]):
-        with pytest.raises(RuntimeError, match="3 turns"):
+        with pytest.raises(agent.MaxTurnsExceeded):
             answer("loop forever", client=client, max_turns=3)
 
 

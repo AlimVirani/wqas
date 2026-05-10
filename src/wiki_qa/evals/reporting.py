@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from wiki_qa.evals.runner import CaseResult
 
-_GRADERS = ["fact_recall", "search_behavior", "honest_failure"]
+_GRADERS = ["fact_recall", "search_behavior", "honest_failure", "faithfulness"]
 
 
 def _label(grade: dict) -> str:
@@ -19,14 +19,15 @@ def _label(grade: dict) -> str:
 def summarize(results: list[CaseResult]) -> None:
     """Print per-case table, per-category pass rates, and overall pass rates."""
     print()
-    header = f"{'id':<35} {'category':<25} {'fact_recall':<14} {'search_behavior':<18} {'honest_failure'}"
+    header = f"{'id':<35} {'category':<25} {'fact_recall':<14} {'search_behavior':<18} {'honest_failure':<18} {'faithfulness'}"
     print(header)
     print("-" * len(header))
     for r in results:
         fr = _label(r.grades["fact_recall"])
         sb = _label(r.grades["search_behavior"])
         hf = _label(r.grades["honest_failure"])
-        print(f"{r.case.id:<35} {r.case.category:<25} {fr:<14} {sb:<18} {hf}")
+        fa = _label(r.grades["faithfulness"])
+        print(f"{r.case.id:<35} {r.case.category:<25} {fr:<14} {sb:<18} {hf:<18} {fa}")
 
     # Per-category pass rates (applicable cases only)
     cat_totals: dict[str, dict[str, list[bool]]] = defaultdict(lambda: {g: [] for g in _GRADERS})
@@ -75,6 +76,10 @@ def dump_json(results: list[CaseResult], path: str) -> None:
             "notes": r.case.notes,
             "answer": r.answer_result.answer,
             "searches": r.answer_result.searches,
+            "retrieved": [
+                [{"title": sr.title, "extract": sr.extract} for sr in per_query]
+                for per_query in r.answer_result.retrieved
+            ],
             "grades": r.grades,
         })
     with open(path, "w") as f:

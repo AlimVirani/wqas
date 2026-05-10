@@ -16,7 +16,15 @@ from wiki_qa.wikipedia import SearchResult, format_results, search
 class AnswerResult:
     answer: str
     searches: list[str]
+    retrieved: list[list[SearchResult]]  # parallel to searches: results returned per query
     messages: list[dict]
+
+
+class MaxTurnsExceeded(Exception):
+    """Raised when the agent loop hits its turn limit. Carries partial state."""
+    def __init__(self, partial: "AnswerResult"):
+        super().__init__(f"Agent did not finish within {len(partial.messages)} turns.")
+        self.partial = partial
 
 
 def answer(
@@ -33,6 +41,7 @@ def answer(
 
     messages: list[dict] = [{"role": "user", "content": question}]
     searches: list[str] = []
+    retrieved: list[list[SearchResult]] = []
 
     for _ in range(max_turns):
         response = client.messages.create(
@@ -49,7 +58,7 @@ def answer(
             text = "".join(
                 block.text for block in response.content if block.type == "text"
             )
-            return AnswerResult(answer=text, searches=searches, messages=messages)
+            return AnswerResult(answer=text, searches=searches, retrieved=retrieved, messages=messages)
 
         if response.stop_reason == "tool_use":
             tool_results = []
@@ -61,6 +70,7 @@ def answer(
                     on_search(query)
                 searches.append(query)
                 results: list[SearchResult] = search(query)
+                retrieved.append(results)
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
@@ -68,4 +78,4 @@ def answer(
                 })
             messages.append({"role": "user", "content": tool_results})
 
-    raise RuntimeError(f"Agent did not finish within {max_turns} turns.")
+    raise MaxTurnsExceeded(AnswerResult(answer="[did not converge]", searches=searches, retrieved=retrieved, messages=messages))

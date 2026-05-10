@@ -14,3 +14,5 @@ results/*
 !results/v0_judge.json
 !results/v1_judge.json
 !results/v2_judge.json
+!results/v3_judge.json
+!results/v2_judge_v2suite.json

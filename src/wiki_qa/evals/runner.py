@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from wiki_qa import agent
 from wiki_qa.agent import AnswerResult
 from wiki_qa.evals.dataset import EvalCase
-from wiki_qa.evals.graders import fact_recall, honest_failure, search_behavior
+from wiki_qa.evals.graders import fact_recall, faithfulness, honest_failure, search_behavior
 
 
 @dataclass
@@ -27,15 +27,24 @@ def run_cases(cases: list[EvalCase]) -> list[CaseResult]:
     results: list[CaseResult] = []
     for case in cases:
         print(f"running: {case.id}")
-        answer_result = agent.answer(case.question)
+        try:
+            answer_result = agent.answer(case.question)
+        except agent.MaxTurnsExceeded as e:
+            print(f"  WARN: max turns exceeded, using partial result")
+            answer_result = e.partial
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            answer_result = AnswerResult(answer=f"[agent error: {e}]", searches=[], retrieved=[], messages=[])
         grades = {
             "fact_recall": fact_recall(case, answer_result),
             "search_behavior": search_behavior(case, answer_result),
             "honest_failure": honest_failure(case, answer_result),
+            "faithfulness": faithfulness(case, answer_result),
         }
         fr = _grade_label(grades["fact_recall"])
         sb = _grade_label(grades["search_behavior"])
         hf = _grade_label(grades["honest_failure"])
-        print(f"  fact_recall: {fr}  search_behavior: {sb}  honest_failure: {hf}")
+        fa = _grade_label(grades["faithfulness"])
+        print(f"  fact_recall: {fr}  search_behavior: {sb}  honest_failure: {hf}  faithfulness: {fa}")
         results.append(CaseResult(case=case, answer_result=answer_result, grades=grades))
     return results
