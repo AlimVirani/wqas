@@ -8,4 +8,9 @@ __pycache__/
 .claude/
 results/*
 !results/.gitkeep
-!results/baseline.json
+!results/v0_substring.json
+!results/v1_substring.json
+!results/v2_substring.json
+!results/v0_judge.json
+!results/v1_judge.json
+!results/v2_judge.json
