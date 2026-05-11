@@ -80,6 +80,14 @@ def test_fact_recall_empty_expected_facts_passes() -> None:
     assert grade["missing"] == []
 
 
+def test_fact_recall_unicode_subscript_matches_ascii() -> None:
+    grade = fact_recall(
+        _case(expected_facts=["H2O"]),
+        _result("The chemical formula is H₂O."),
+    )
+    assert grade["passed"] is True
+
+
 # ---------------------------------------------------------------------------
 # search_behavior
 # ---------------------------------------------------------------------------

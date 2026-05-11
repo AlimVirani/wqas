@@ -8,6 +8,13 @@ from wiki_qa.evals.runner import CaseResult
 
 _GRADERS = ["fact_recall", "search_behavior", "honest_failure", "faithfulness"]
 _SHORT = {"fact_recall": "fact", "search_behavior": "search", "honest_failure": "honest", "faithfulness": "faith"}
+_GROUP_ORDER = ["product", "hard", "simple_factual", "known_fact", "multi_hop"]
+
+
+def _group_key(r: CaseResult) -> str:
+    if r.case.bucket in ("product", "hard"):
+        return r.case.bucket
+    return r.case.category
 
 _PASS = "✓"
 _FAIL = "✗"
@@ -32,32 +39,37 @@ def _score(cases: list[CaseResult], grader: str) -> str:
 
 
 def summarize(results: list[CaseResult]) -> None:
-    """Print symbol-based summary, per-case table grouped by category, and pass rates."""
-    # Graders that were actually run in this batch
+    """Print symbol-based summary, per-case table grouped by bucket, and pass rates."""
     run_graders = [g for g in _GRADERS if any(g in r.grades for r in results)]
 
-    # Category groups preserving dataset order
-    cats: dict[str, list[CaseResult]] = {}
+    # Build groups in fixed order; preserve dataset order within each group
+    groups: dict[str, list[CaseResult]] = {g: [] for g in _GROUP_ORDER}
     for r in results:
-        cats.setdefault(r.case.category, []).append(r)
+        key = _group_key(r)
+        groups.setdefault(key, []).append(r)
+    # Drop empty groups, maintain _GROUP_ORDER then any extras
+    ordered = [(k, groups[k]) for k in _GROUP_ORDER if groups.get(k)]
+    ordered += [(k, v) for k, v in groups.items() if k not in _GROUP_ORDER and v]
 
     n_cases = len(results)
     n_graders = len(run_graders)
-    print(f"\nWikipedia QA eval suite — {n_cases} cases, {n_graders} graders\n")
+    group_names = ", ".join(k for k, _ in ordered)
+    print(f"\nWikipedia QA eval suite — {n_cases} cases, {n_graders} graders")
+    print(f"Groups: {group_names}\n")
 
-    # Summary bar: one row per grader, symbols grouped by category
+    # Summary bar: one row per grader, symbols blocked by group
     for g in run_graders:
-        cat_blocks = ["".join(_sym(r.grades.get(g)) for r in cat_rs) for cat_rs in cats.values()]
-        sym_str = "  ".join(cat_blocks)
+        blocks = ["".join(_sym(r.grades.get(g)) for r in grp_rs) for _, grp_rs in ordered]
+        sym_str = "  ".join(blocks)
         score = _score(results, g)
         label = _SHORT.get(g, g)
         print(f"  {label:<10} {sym_str}   {score}")
 
-    # Per-case table grouped by category
+    # Per-case table grouped by bucket
     print("\nBy case:\n")
-    for cat, cat_results in cats.items():
-        print(f"{cat} ({len(cat_results)})")
-        for r in cat_results:
+    for grp_name, grp_results in ordered:
+        print(f"{grp_name} ({len(grp_results)})")
+        for r in grp_results:
             row_syms = "".join(_sym(r.grades.get(g)) for g in run_graders)
             detail = "  ".join(
                 f"{_SHORT.get(g, g)}:{_sym(r.grades.get(g))}" for g in run_graders
@@ -65,18 +77,18 @@ def summarize(results: list[CaseResult]) -> None:
             print(f"  {row_syms}  {r.case.id:<42} {detail}")
         print()
 
-    # Per-category pass rates
-    print("Per-category pass rates:")
-    for cat, cat_results in cats.items():
+    # Per-group pass rates
+    print("Per-group pass rates:")
+    for grp_name, grp_results in ordered:
         parts = []
         for g in run_graders:
-            applicable = [r for r in cat_results if r.grades.get(g) is not None and r.grades[g].get("applicable", True)]
+            applicable = [r for r in grp_results if r.grades.get(g) is not None and r.grades[g].get("applicable", True)]
             if not applicable:
                 parts.append(f"{_SHORT.get(g, g)}:n/a")
             else:
                 passed = sum(1 for r in applicable if r.grades[g]["passed"])
                 parts.append(f"{_SHORT.get(g, g)}:{passed}/{len(applicable)}")
-        print(f"  {cat:<30} {', '.join(parts)}")
+        print(f"  {grp_name:<30} {', '.join(parts)}")
 
     # Overall
     print()
