@@ -8,6 +8,7 @@ __pycache__/
 .claude/
 results/*
 !results/.gitkeep
+!results/README.md
 !results/v0_substring.json
 !results/v1_substring.json
 !results/v2_substring.json
